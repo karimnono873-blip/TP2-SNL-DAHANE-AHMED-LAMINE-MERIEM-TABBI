@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TP2 - Systèmes Non Linéaires | Deep Space Edition</title>
+    
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    
+    <style>
+        /* ==========================================================================
+           1. VARIABLES GLOBALES & THÈME "DEEP SPACE"
+           ========================================================================== */
+        :root {
+            /* Palette de couleurs Spatiales */
+            --space-dark: #05070d;
+            --space-light: #0b0f19;
+            --panel-bg: rgba(13, 17, 28, 0.75);
+            --panel-border: rgba(0, 240, 255, 0.2);
+            --panel-glow: rgba(0, 240, 255, 0.05);
+            
+            /* Couleurs Néon pour les accents */
+            --neon-cyan: #00f0ff;
+            --neon-magenta: #ff007f;
+            --neon-purple: #8a2be2;
+            --neon-green: #00ff88;
+            --neon-yellow: #ffea00;
+            
+            /* Typographie */
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --font-main: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'Fira Code', 'Consolas', 'Monaco', monospace;
+            
+            /* Grille & Effets */
+            --grid-color: rgba(255, 255, 255, 0.02);
+            --glass-blur: blur(16px);
+            --transition-speed: 0.3s;
+        }
+
+        /* ==========================================================================
+           2. RESET & STYLES DE BASE
+           ========================================================================== */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background-color: var(--space-dark);
+            background-image: 
+                linear-gradient(var(--grid-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: 40px 40px;
+            color: var(--text-primary);
+            font-family: var(--font-main);
+            line-height: 1.7;
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Nébuleuse d'arrière-plan */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -20%; left: -10%; width: 120%; height: 120%;
+            background: radial-gradient(circle at 30% 20%, rgba(138, 43, 226, 0.08), transparent 40%),
+                        radial-gradient(circle at 80% 70%, rgba(0, 240, 255, 0.06), transparent 40%);
+            z-index: -1;
+            pointer-events: none;
+            animation: pulse-nebula 15s infinite alternate ease-in-out;
+        }
+
+        @keyframes pulse-nebula {
+            0% { opacity: 0.7; transform: scale(1); }
+            100% { opacity: 1; transform: scale(1.05); }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: var(--space-dark); }
+        ::-webkit-scrollbar-thumb { background: rgba(0, 240, 255, 0.3); border-radius: 5px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--neon-cyan); }
+
+        /* ==========================================================================
+           3. LAYOUT & GRILLES
+           ========================================================================== */
+        .dashboard {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 2rem;
+        }
+
+        .col-12 { grid-column: span 12; }
+        .col-8 { grid-column: span 8; }
+        .col-6 { grid-column: span 6; }
+        .col-4 { grid-column: span 4; }
+
+        @media (max-width: 1200px) {
+            .col-8, .col-4 { grid-column: span 12; }
+        }
+        @media (max-width: 768px) {
+            .col-6 { grid-column: span 12; }
+            .dashboard { padding: 1rem; }
+        }
+
+        /* ==========================================================================
+           4. COMPOSANTS UI (PANNEAUX, CARTES)
+           ========================================================================== */
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            padding: 2rem;
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            transition: all var(--transition-speed) ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
+            opacity: 0.3;
+            transition: opacity var(--transition-speed);
+        }
+
+        .panel:hover {
+            border-color: rgba(0, 240, 255, 0.5);
+            box-shadow: 0 15px 40px var(--panel-glow);
+            transform: translateY(-2px);
+        }
+
+        .panel:hover::before { opacity: 1; }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 1rem;
+        }
+
+        .panel-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--neon-cyan);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .panel-title::before {
+            content: '/>';
+            color: var(--neon-magenta);
+            font-family: var(--font-mono);
+        }
+
+        /* ==========================================================================
+           5. TYPOGRAPHIE AVANCÉE & FORMATAGE TEXTE
+           ========================================================================== */
+        .header-main {
+            text-align: center;
+            padding: 3rem 0 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .title-glitch {
+            font-size: 3.5rem;
+            font-weight: 900;
+            background: linear-gradient(to right, var(--neon-cyan), var(--neon-purple), var(--neon-magenta));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+            margin-bottom: 1rem;
+            position: relative;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            letter-spacing: 1px;
+        }
+
+        p {
+            margin-bottom: 1.2rem;
+            text-align: justify;
+        }
+
+        .highlight { color: var(--neon-cyan); font-weight: 600; }
+        .danger { color: var(--neon-magenta); font-weight: 600; }
+        .success { color: var(--neon-green); font-weight: 600; }
+
+        /* Bloc Théorique Mathématique */
+        .math-block {
+            background: rgba(0, 0, 0, 0.6);
+            border-left: 4px solid var(--neon-purple);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            border-radius: 0 8px 8px 0;
+            font-family: var(--font-mono);
+            font-size: 1.1rem;
+            color: #fff;
+            overflow-x: auto;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        .math-block::after {
+            content: 'EQ';
+            position: absolute;
+            top: 5px; right: 10px;
+            font-size: 0.7rem;
+            color: rgba(255,255,255,0.2);
+            letter-spacing: 2px;
+        }
+
+        .math-line { display: block; margin-bottom: 0.5rem; }
+        .math-line:last-child { margin-bottom: 0; }
+
+        ul.feature-list {
+            list-style: none;
+            margin-left: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        ul.feature-list li {
+            position: relative;
+            padding-left: 2rem;
+            margin-bottom: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        ul.feature-list li::before {
+            content: '▹';
+            position: absolute;
+            left: 0;
+            color: var(--neon-cyan);
+            font-size: 1.2rem;
+            top: -2px;
+        }
+
+        /* ==========================================================================
+           6. SVG SIMULINK ENGINE (INTERACTIF)
+           ========================================================================== */
+        .svg-canvas-wrapper {
+            background: #0a0d14;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 1rem;
+            overflow-x: auto;
+            position: relative;
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.8);
+        }
+
+        .svg-grid {
+            patternUnits: userSpaceOnUse;
+            width: 20; height: 20;
+        }
+        
+        .svg-grid path {
+            fill: none; stroke: rgba(255,255,255,0.03); stroke-width: 1;
+        }
+
+        svg text {
+            font-family: var(--font-main);
+            fill: #fff;
+            font-size: 12px;
+            user-select: none;
+        }
+
+        /* Blocs Simulink */
+        .blk-core {
+            fill: rgba(20, 25, 40, 0.9);
+            stroke: var(--neon-cyan);
+            stroke-width: 2;
+            rx: 6;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .blk-core:hover {
+            fill: rgba(30, 40, 60, 0.9);
+            stroke: var(--neon-magenta);
+            filter: drop-shadow(0 0 8px var(--neon-magenta));
+        }
+
+        /* Lignes de signaux */
+        .sig-line {
+            fill: none;
+            stroke-width: 2.5;
+            stroke-linejoin: round;
+            stroke-linecap: round;
+        }
+        .sig-forward { stroke: #3b82f6; }
+        .sig-feedback { stroke: var(--neon-purple); stroke-dasharray: 5 3; }
+        
+        /* Animation de flux sur les lignes (optionnel) */
+        .sig-flow {
+            stroke-dasharray: 10;
+            animation: flow-anim 1s linear infinite;
+        }
+        @keyframes flow-anim { to { stroke-dashoffset: -20; } }
+
+        .arrow-head { fill: #3b82f6; }
+        .arrow-feedback { fill: var(--neon-purple); }
+
+        .math-node {
+            fill: #0f172a;
+            stroke: var(--neon-magenta);
+            stroke-width: 2;
+            cursor: help;
+        }
+
+        /* ==========================================================================
+           7. INTERFACE DE CONTRÔLE (FORMULAIRES & SLIDERS)
+           ========================================================================== */
+        .control-board {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+        }
+
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .slider-label {
+            font-size: 0.95rem;
+            color: var(--neon-cyan);
+            font-weight: 600;
+            font-family: var(--font-mono);
+        }
+
+        .slider-value {
+            background: rgba(0, 240, 255, 0.1);
+            border: 1px solid var(--neon-cyan);
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            color: #fff;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        /* Input Range personnalisé */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]:focus { outline: none; }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 6px; cursor: pointer;
+            background: rgba(255, 255, 255, 0.1); border-radius: 3px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 18px; width: 18px; border-radius: 50%;
+            background: var(--neon-purple);
+            cursor: pointer; -webkit-appearance: none;
+            margin-top: -6px;
+            box-shadow: 0 0 10px rgba(138, 43, 226, 0.8);
+            transition: transform 0.2s, background 0.2s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.3);
+            background: var(--neon-magenta);
+            box-shadow: 0 0 15px rgba(255, 0, 127, 0.8);
+        }
+
+        /* Bouton Cyber */
+        .btn-cyber {
+            background: linear-gradient(45deg, rgba(138,43,226,0.2), rgba(0,240,255,0.2));
+            border: 1px solid var(--neon-cyan);
+            color: #fff;
+            padding: 1rem;
+            font-family: var(--font-mono);
+            font-size: 1rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            margin-top: 1rem;
+        }
+        
+        .btn-cyber::before {
+            content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .btn-cyber:hover {
+            background: linear-gradient(45deg, rgba(138,43,226,0.4), rgba(0,240,255,0.4));
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+            transform: translateY(-2px);
+        }
+        
+        .btn-cyber:hover::before { left: 100%; }
+
+        /* ==========================================================================
+           8. CONTENEUR PLOTLY
+           ========================================================================== */
+        .plot-wrapper {
+            width: 100%;
+            height: 550px;
+            background: #030508;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            overflow: hidden;
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.8);
+        }
+
+        /* ==========================================================================
+           9. BLOCS DE CODE (SYNTAX HIGHLIGHTING)
+           ========================================================================== */
+        pre {
+            background: #010204;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            overflow-x: auto;
+            font-family: var(--font-mono);
+            font-size: 0.95rem;
+            line-height: 1.6;
+            tab-size: 4;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.9);
+        }
+
+        /* Tokens de couleur (Style Dracula/OneDark) */
+        .tk-comment { color: #5c6370; font-style: italic; }
+        .tk-keyword { color: #c678dd; font-weight: bold; }
+        .tk-string  { color: #98c379; }
+        .tk-function { color: #61afef; }
+        .tk-number  { color: #d19a66; }
+        .tk-operator { color: #56b6c2; }
+        .tk-def     { color: #e5c07b; }
+
+        /* ==========================================================================
+           10. PIED DE PAGE & SIGNATURE
+           ========================================================================== */
+        .footer-sig {
+            text-align: center;
+            padding: 4rem 0 2rem;
+            margin-top: 3rem;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            grid-column: 1 / -1;
+        }
+
+        .creator-tag {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: 1rem;
+            color: var(--neon-purple);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            padding: 1rem 2rem;
+            border: 1px solid rgba(138, 43, 226, 0.3);
+            border-radius: 50px;
+            background: rgba(138, 43, 226, 0.05);
+            transition: all 0.3s;
+        }
+
+        .creator-tag:hover {
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard">
+    <header class="header-main col-12">
+        <h1 class="title-glitch">DYNAMIQUE NON LINÉAIRE</h1>
+        <div class="subtitle">TP N°2 - Plan de Phase, Boucles Algébriques & Oscillateur de Van der Pol</div>
+    </header>
+
+    <section class="panel col-12">
+        <div class="panel-header">
+            <h2 class="panel-title">1. Modélisation et Résolution de Systèmes Couplés</h2>
+        </div>
+        
+        <div class="dashboard" style="padding: 0; gap: 2rem;">
+            <div class="col-6">
+                <p>La première partie du TP exige la modélisation d'un système dynamique décrit par deux équations différentielles non linéaires fortement couplées. Les équations initiales (1) et (2) sont données sous forme implicite :</p>
+                
+                <div class="math-block">
+                    <span class="math-line">(1) <span class="tk-operator">ÿ₁</span> + 2*<span class="tk-operator">ẏ₁</span>*<span class="tk-operator">ẏ₂</span> + y₁ = u₁</span>
+                    <span class="math-line">(2) <span class="tk-operator">ÿ₂</span> + 3*<span class="tk-operator">ẏ₁</span>*<span class="tk-operator">ẏ₂</span> + 4*y₂ + 2*y₁*y₂ = u₂</span>
+                </div>
+                
+                <p>Pour implémenter ce système dans un environnement de schéma bloc causal comme <span class="highlight">Simulink</span>, nous devons isoler les termes dérivés de plus haut degré. En réarrangeant algébriquement, nous obtenons la forme d'état explicite nécessaire à l'intégration numérique :</p>
+            </div>
+            
+            <div class="col-6">
+                <div class="math-block" style="border-left-color: var(--neon-cyan);">
+                    <span class="math-line"><span class="tk-def">ẏ₁</span> = -2*(<span class="tk-operator">ẏ₁</span>*<span class="tk-operator">ẏ₂</span>) - y₁ + u₁</span>
+                    <span class="math-line"><span class="tk-def">ẏ₂</span> = -3*(<span class="tk-operator">ẏ₁</span>*<span class="tk-operator">ẏ₂</span>) - 4*y₂ - 2*(y₁*y₂) + u₂</span>
+                </div>
+                
+                <p><span class="danger">Le Phénomène de Boucle Algébrique :</span> En observant ces équations, on constate que <code>ẏ₁</code> et <code>ẏ₂</code> dépendent d'eux-mêmes instantanément (présence à gauche et à droite de l'égalité). Dans Simulink, cela force le solveur temporel à utiliser des méthodes itératives (comme Newton-Raphson) à chaque pas de calcul pour résoudre <code>f(z) = 0</code>. Le schéma ci-dessous illustre comment prélever ces signaux de dérivées <em>avant</em> l'intégration pour construire les termes multiplicatifs.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="panel col-12">
+        <div class="panel-header">
+            <h2 class="panel-title">Architecture Vectorielle Simulink (Boucles Implicites)</h2>
+        </div>
+        <p>Survolez les blocs pour mettre en évidence les composants. Les chemins en pointillés violets représentent les rebouclages d'état (feedbacks), tandis que les lignes continues bleues représentent le flux direct d'intégration.</p>
+        
+        <div class="svg-canvas-wrapper">
+            <svg viewBox="0 0 900 450" width="100%" height="500" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <pattern id="grid" class="svg-grid"><path d="M 20 0 L 0 0 0 20"/></pattern>
+                    <marker id="arr-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-head" />
+                    </marker>
+                    <marker id="arr-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-feedback" />
+                    </marker>
+                    
+                    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="3" result="blur" />
+                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+                </defs>
+                
+                <rect width="100%" height="100%" fill="url(#grid)" />
+
+                <text x="20" y="85" fill="#00f0ff" font-weight="bold" font-size="14">u₁ (Step)</text>
+                <path d="M 70 80 L 110 80" class="sig-line sig-forward" marker-end="url(#arr-blue)" />
+                
+                <circle cx="120" cy="80" r="12" class="math-node" />
+                <text x="113" y="85" fill="#ff007f" font-size="16" font-weight="bold">∑</text>
+                
+                <path d="M 132 80 L 220 80" class="sig-line sig-forward" marker-end="url(#arr-blue)" />
+                <text x="150" y="70" fill="#94a3b8">ẏ₁ (Dérivée)</text>
+
+                <circle cx="170" cy="80" r="4" fill="#00f0ff"/>
+                <path d="M 170 80 L 170 190 L 290 190" class="sig-line sig-feedback" marker-end="url(#arr-purple)" />
+
+                <rect x="220" y="60" width="60" height="40" class="blk-core" />
+                <text x="240" y="85" font-weight="bold" font-size="14">∫ 1/s</text>
+
+                <path d="M 280 80 L 700 80" class="sig-line sig-forward" marker-end="url(#arr-blue)" />
+                <text x="710" y="85" fill="#00f0ff" font-weight="bold" font-size="16">y₁</text>
+                
+                <circle cx="600" cy="80" r="4" fill="#00f0ff"/>
+                <path d="M 600 80 L 600 30 L 120 30 L 120 68" class="sig-line sig-feedback" marker-end="url(#arr-purple)" />
+                <rect x="340" y="15" width="50" height="30" class="blk-core" />
+                <text x="355" y="35">-1</text>
+
+                <rect x="300" y="180" width="50" height="50" class="blk-core" filter="url(#glow)" />
+                <text x="315" y="210" font-weight="bold" fill="#ffea00">∏ (X)</text>
+
+                <path d="M 350 205 L 380 205 L 380 135 L 390 135" class="sig-line sig-feedback" marker-end="url(#arr-purple)" />
+                <rect x="390" y="120" width="50" height="30" class="blk-core" />
+                <text x="405" y="140" font-weight="bold">-2</text>
+                <path d="M 440 135 L 480 135 L 480 70 L 132 70" class="sig-line sig-feedback" marker-end="url(#arr-purple)" />
+
+                <path d="M 350 205 L 380 205 L 380 275 L 390 275" class="sig-line sig-feedback" marker-end="url(#arr-purple)" />
+                <rect x="390" y="260" width="50" height="30" class="blk-core" />
+                <text x="405" y="280" font-weight="bold">-3</text>
+                <path d="M 440 275 L 500 275 L 500 340 L 132 340" class="sig-line sig-feedback" marker-end="url(#arr-purple)" />
+
+                <rect x="580" y="180" width="50" height="50" class="blk-core" filter="url(#glow)" />
+                <text x="595" y="210" font-weight="bold" fill="#ffea00">∏ (X)</text>
+                
+                <circle cx="630" cy="80" r="4" fill="#00f0ff"/>
+                <path d="M 630 80 L 630 190 L 630 190" class="sig-line sig-feedback" marker-end="url(#arr-purple)" />
+                
+                <circle cx="630" cy="350" r="4" fill="#00f0ff"/>
+                <path d="M 630 350 L 630 220 L 630 220" class="sig-line sig-feedback" marker-end="url(#arr-purple)" />
+
+                <rect x="490" y="190" width="50" height="30" class="blk-core" />
+                <text x="505" y="210" font-weight="bold">-2</text>
+                <path d="M 580 205 L 540 205" class="sig-line sig-feedback" marker-end="url(#arr-purple)" />
+                <path d="M 490 205 L 120 205 L 120 338" class="sig-line sig-feedback" marker-end="url(#arr-purple)" />
+
+
+                <text x="20" y="355" fill="#00f0ff" font-weight="bold" font-size="14">u₂ (Step)</text>
+                <path d="M 70 350 L 110 350" class="sig-line sig-forward" marker-end="url(#arr-blue)" />
+                
+                <circle cx="120" cy="350" r="12" class="math-node" />
+                <text x="113" y="355" fill="#ff007f" font-size="16" font-weight="bold">∑</text>
+                
+                <path d="M 132 350 L 220 350" class="sig-line sig-forward" marker-end="url(#arr-blue)" />
+                <text x="150" y="340" fill="#94a3b8">ẏ₂ (Dérivée)</text>
+
+                <circle cx="170" cy="350" r="4" fill="#00f0ff"/>
+                <path d="M 170 350 L 170 220 L 290 220" class="sig-line sig-feedback" marker-end="url(#arr-purple)" />
+
+                <rect x="220" y="330" width="60" height="40" class="blk-core" />
+                <text x="240" y="355" font-weight="bold" font-size="14">∫ 1/s</text>
+
+                <path d="M 280 350 L 700 350" class="sig-line sig-forward" marker-end="url(#arr-blue)" />
+                <text x="710" y="355" fill="#00f0ff" font-weight="bold" font-size="16">y₂</text>
+
+                <rect x="420" y="380" width="50" height="30" class="blk-core" />
+                <text x="435" y="400" font-weight="bold">-4</text>
+                <circle cx="660" cy="350" r="4" fill="#00f0ff"/>
+                <path d="M 660 350 L 660 395 L 470 395" class="sig-line sig-feedback" marker-end="url(#arr-purple)" />
+                <path d="M 420 395 L 120 395 L 120 362" class="sig-line sig-feedback" marker-end="url(#arr-purple)" />
+
+            </svg>
+        </div>
+    </section>
+
+    <section class="panel col-4">
+        <div class="panel-header">
+            <h2 class="panel-title">L'Oscillateur de Van der Pol</h2>
+        </div>
+        <p>Ce système représente un circuit électronique à tube à vide avec une résistance non linéaire. Son équation différentielle fondamentale est :</p>
+        <div class="math-block">
+            <span class="math-line"><span class="tk-operator">ẍ</span> + <span class="tk-keyword">μ</span>(x² - 1)<span class="tk-operator">ẋ</span> + x = 0</span>
+        </div>
+        <p><strong>Transformation d'État :</strong> Pour intégrer numériquement ce système, nous devons le réduire à un système d'ordre 1. Posons <span class="highlight">x₁ = x</span> (position) et <span class="highlight">x₂ = ẋ</span> (vitesse) :</p>
+        <ul class="feature-list">
+            <li><span class="tk-def">ẋ₁</span> = x₂</li>
+            <li><span class="tk-def">ẋ₂</span> = -<span class="tk-keyword">μ</span>(x₁² - 1)x₂ - x₁</li>
+        </ul>
+        <p>Le paramètre <span class="danger">μ (mu)</span> dicte la nature de l'amortissement. S'il est positif, le système tend vers un attracteur stable unique appelé <strong>Cycle Limite</strong>, caractéristique clé du plan de phase non linéaire.</p>
+    </section>
+
+    <section class="panel col-8">
+        <div class="panel-header">
+            <h2 class="panel-title">Moteur Physique (Runge-Kutta RK4)</h2>
+        </div>
+        
+        <div class="control-board">
+            <div class="dashboard" style="padding:0; gap:1.5rem;">
+                <div class="col-4 slider-group">
+                    <div class="slider-header">
+                        <span class="slider-label">Friction Non-Linéaire (μ)</span>
+                        <span class="slider-value" id="val-mu">0.5</span>
+                    </div>
+                    <input type="range" id="param-mu" min="-1.5" max="3.0" step="0.1" value="0.5">
+                </div>
+                
+                <div class="col-4 slider-group">
+                    <div class="slider-header">
+                        <span class="slider-label">Pos. Initiale (x₁)</span>
+                        <span class="slider-value" id="val-x1">1.0</span>
+                    </div>
+                    <input type="range" id="param-x1" min="-4.0" max="4.0" step="0.25" value="1.0">
+                </div>
+                
+                <div class="col-4 slider-group">
+                    <div class="slider-header">
+                        <span class="slider-label">Vit. Initiale (x₂)</span>
+                        <span class="slider-value" id="val-x2">1.0</span>
+                    </div>
+                    <input type="range" id="param-x2" min="-4.0" max="4.0" step="0.25" value="1.0">
+                </div>
+            </div>
+            
+            <button id="btn-calc" class="btn-cyber">Lancer l'Intégration Numérique (t=0..25s)</button>
+        </div>
+    </section>
+
+    <section class="panel col-12">
+        <div class="panel-header">
+            <h2 class="panel-title">Plan de Phase & Champ de Vecteurs (Temps Réel)</h2>
+        </div>
+        <div class="plot-wrapper" id="plotly-container"></div>
+    </section>
+
+    <section class="panel col-12">
+        <div class="panel-header">
+            <h2 class="panel-title">Script MATLAB Officiel - Résolution Multi-Cas</h2>
+        </div>
+        <p>L'implémentation algorithmique MATLAB ci-dessous satisfait rigoureusement le cahier des charges du TP en balayant les matrices de conditions initiales <code>CI ∈ {(-3,3), (3,-3), (1,1)}</code> et les paramètres de friction <code>μ ∈ {-0.5, 0, 0.5}</code>.</p>
+        
+<pre><code><span class="tk-comment">% =========================================================================</span>
+<span class="tk-comment">% INSTITUTION : U.S.T.H.B / F.G.E. - Département d'Automatique</span>
+<span class="tk-comment">% MODULE      : Systèmes non linéaires (2025-2026)</span>
+<span class="tk-comment">% SUJET       : TP N° 2 - Plan de Phase - L'oscillateur de Van der Pol</span>
+<span class="tk-comment">% =========================================================================</span>
+
+<span class="tk-keyword">function</span> tp2_vanderpol_solver()
+    <span class="tk-comment">% 1. Configuration des paramètres de simulation</span>
+    tspan = [<span class="tk-number">0</span>, <span class="tk-number">25</span>]; <span class="tk-comment">% Horizon temporel d'intégration (en secondes)</span>
+    
+    <span class="tk-comment">% 2. Définition des jeux de paramètres (Selon Cahier des Charges)</span>
+    matrice_CI = [-<span class="tk-number">3</span>, <span class="tk-number">3</span>; <span class="tk-number">3</span>, -<span class="tk-number">3</span>; <span class="tk-number">1</span>, <span class="tk-number">1</span>]; <span class="tk-comment">% [x1_initial, x2_initial]</span>
+    vecteur_mu = [-<span class="tk-number">0.5</span>, <span class="tk-number">0</span>, <span class="tk-number">0.5</span>];       <span class="tk-comment">% Paramètre de non-linéarité</span>
+
+    <span class="tk-comment">% 3. Préparation de l'interface graphique MATLAB</span>
+    figure(<span class="tk-string">'Name'</span>, <span class="tk-string">'Analyse du Plan de Phase - Van der Pol'</span>, <span class="tk-string">'Color'</span>, <span class="tk-string">'w'</span>, <span class="tk-string">'Position'</span>, [<span class="tk-number">100</span>, <span class="tk-number">100</span>, <span class="tk-number">1200</span>, <span class="tk-number">400</span>]);
+
+    <span class="tk-comment">% 4. Boucle d'itération principale sur le paramètre mu</span>
+    <span class="tk-keyword">for</span> idx_mu = <span class="tk-number">1</span>:length(vecteur_mu)
+        mu = vecteur_mu(idx_mu);
+        
+        <span class="tk-comment">% Création d'un sous-graphique pour chaque valeur de mu</span>
+        subplot(<span class="tk-number">1</span>, <span class="tk-number">3</span>, idx_mu);
+        hold <span class="tk-string">on</span>; grid <span class="tk-string">on</span>;
+        
+        <span class="tk-comment">% Formatage du graphique</span>
+        title(sprintf(<span class="tk-string">'Dynamique pour \\mu = %.1f'</span>, mu), <span class="tk-string">'FontWeight'</span>, <span class="tk-string">'bold'</span>, <span class="tk-string">'FontSize'</span>, <span class="tk-number">12</span>);
+        xlabel(<span class="tk-string">'Variable d''état x_1 (Position)'</span>);
+        ylabel(<span class="tk-string">'Variable d''état x_2 (Vitesse)'</span>);
+        
+        <span class="tk-comment">% 5. Sous-boucle pour tester toutes les conditions initiales pour un mu donné</span>
+        <span class="tk-keyword">for</span> idx_ci = <span class="tk-number">1</span>:size(matrice_CI, <span class="tk-number">1</span>)
+            x0 = matrice_CI(idx_ci, :);
+            
+            <span class="tk-comment">% 6. Déclaration de la fonction d'état du système (modèle mathématique)</span>
+            <span class="tk-comment">% Forme matricielle implicite: dx/dt = f(t,x)</span>
+            sys_vdp = @(t, x) [
+                x(<span class="tk-number">2</span>); 
+                -mu * (x(<span class="tk-number">1</span>)^<span class="tk-number">2</span> - <span class="tk-number">1</span>) * x(<span class="tk-number">2</span>) - x(<span class="tk-number">1</span>)
+            ];
+            
+            <span class="tk-comment">% 7. Appel au solveur numérique (Runge-Kutta d'ordre 4/5 à pas variable)</span>
+            <span class="tk-comment">% ode45 gère automatiquement la taille du pas de calcul dt pour garantir la précision</span>
+            [vect_t, matrice_x] = <span class="tk-function">ode45</span>(sys_vdp, tspan, x0);
+            
+            <span class="tk-comment">% 8. Rendu de la trajectoire dans l'espace des phases (x1 vs x2)</span>
+            <span class="tk-function">plot</span>(matrice_x(:,<span class="tk-number">1</span>), matrice_x(:,<span class="tk-number">2</span>), <span class="tk-string">'LineWidth'</span>, <span class="tk-number">1.5</span>, ...
+                 <span class="tk-string">'DisplayName'</span>, sprintf(<span class="tk-string">'CI = (%.1f,  %.1f)'</span>, x0(<span class="tk-number">1</span>), x0(<span class="tk-number">2</span>)));
+                 
+            <span class="tk-comment">% Placement d'un marqueur visuel pour indiquer le point de départ de l'intégration</span>
+            <span class="tk-function">plot</span>(x0(<span class="tk-number">1</span>), x0(<span class="tk-number">2</span>), <span class="tk-string">'ko'</span>, <span class="tk-string">'MarkerFaceColor'</span>, <span class="tk-string">'k'</span>, <span class="tk-string">'HandleVisibility'</span>, <span class="tk-string">'off'</span>);
+        <span class="tk-keyword">end</span>
+        
+        <span class="tk-comment">% Activation de la légende pour identifier les courbes</span>
+        legend(<span class="tk-string">'Location'</span>, <span class="tk-string">'best'</span>);
+        axis([-<span class="tk-number">4</span> <span class="tk-number">4</span> -<span class="tk-number">4</span> <span class="tk-number">4</span>]); <span class="tk-comment">% Fixation des axes pour comparaison homogène</span>
+    <span class="tk-keyword">end</span>
+    
+    <span class="tk-comment">% Titre global de l'interface</span>
+    sgtitle(<span class="tk-string">'Analyse Globale du Plan de Phase - Oscillateur Non Linéaire'</span>, <span class="tk-string">'FontSize'</span>, <span class="tk-number">16</span>);
+<span class="tk-keyword">end</span>
+</code></pre>
+    </section>
+
+    <footer class="footer-sig">
+        <div class="creator-tag">created by DAHANE AHMED LAMINE</div>
+    </footer>
+</div>
+
+<script>
+    /**
+     * @file Moteur d'intégration et de rendu web pour systèmes dynamiques.
+     * Implémente la méthode de Runge-Kutta (RK4) pour résoudre l'oscillateur de Van der Pol
+     * et génère dynamiquement le champ de vecteurs.
+     */
+    document.addEventListener('DOMContentLoaded', () => {
+        
+        // 1. Récupération des éléments du DOM
+        const paramMu = document.getElementById('param-mu');
+        const paramX1 = document.getElementById('param-x1');
+        const paramX2 = document.getElementById('param-x2');
+        const displayMu = document.getElementById('val-mu');
+        const displayX1 = document.getElementById('val-x1');
+        const displayX2 = document.getElementById('val-x2');
+        const btnCalc = document.getElementById('btn-calc');
+
+        // 2. Configuration esthétique du graphique Plotly (Thème Deep Space)
+        const plotlyLayout = {
+            paper_bgcolor: 'transparent',
+            plot_bgcolor: 'transparent',
+            margin: { t: 40, r: 40, l: 60, b: 60 },
+            title: {
+                text: 'Espace des phases (x₁, x₂)',
+                font: { color: '#00f0ff', family: 'Inter', size: 16 }
+            },
+            xaxis: { 
+                title: { text: 'État x₁ (Position)', font: { color: '#94a3b8' } },
+                gridcolor: 'rgba(255,255,255,0.05)',
+                zerolinecolor: 'rgba(255,255,255,0.2)',
+                tickfont: { color: '#64748b' },
+                range: [-5, 5]
+            },
+            yaxis: { 
+                title: { text: 'État x₂ (Vitesse)', font: { color: '#94a3b8' } },
+                gridcolor: 'rgba(255,255,255,0.05)',
+                zerolinecolor: 'rgba(255,255,255,0.2)',
+                tickfont: { color: '#64748b' },
+                range: [-5, 5]
+            },
+            showlegend: true,
+            legend: { font: { color: '#e2e8f0' }, bgcolor: 'rgba(0,0,0,0.5)' }
+        };
+
+        const plotlyConfig = { responsive: true, displayModeBar: false };
+
+        /**
+         * Génère un champ de vecteurs (Quiver plot) pour visualiser la tendance globale du système
+         * @param {number} mu Paramètre de friction
+         * @returns {Object} Trace Plotly du champ de vecteurs
+         */
+        function generateVectorField(mu) {
+            const scale = 0.15; // Facteur d'échelle pour la taille des flèches
+            let xPoints = [], yPoints = [], uPoints = [], vPoints = [];
+
+            // Création d'une grille uniforme
+            for (let x = -4.5; x <= 4.5; x += 0.5) {
+                for (let y = -4.5; y <= 4.5; y += 0.5) {
+                    // Calcul des dérivées (dx/dt, dy/dt) au point (x,y)
+                    let dx = y;
+                    let dy = -mu * (x*x - 1) * y - x;
+                    
+                    // Normalisation de la longueur du vecteur pour un affichage propre
+                    let norm = Math.sqrt(dx*dx + dy*dy);
+                    if (norm > 0) {
+                        dx = (dx / norm) * scale;
+                        dy = (dy / norm) * scale;
+                    }
+
+                    // Stockage des coordonnées du segment (ligne)
+                    xPoints.push(x, x + dx, null);
+                    yPoints.push(y, y + dy, null);
+                }
+            }
+
+            return {
+                x: xPoints, y: yPoints,
+                mode: 'lines',
+                line: { color: 'rgba(138, 43, 226, 0.4)', width: 1 },
+                name: 'Champ de vecteurs',
+                hoverinfo: 'none'
+            };
+        }
+
+        /**
+         * Moteur d'intégration numérique : Méthode de Runge-Kutta d'ordre 4
+         * @param {number} mu Paramètre du système
+         * @param {number} x1_0 Condition initiale x1
+         * @param {number} x2_0 Condition initiale x2
+         * @returns {Object} Objet contenant les tableaux de données x1 et x2
+         */
+        function integrateRK4(mu, x1_0, x2_0) {
+            // Paramètres temporels
+            const dt = 0.02; // Pas de calcul très fin pour une courbe lisse
+            const t_max = 30; // Horizon étendu à 30s
+            
+            let t = 0;
+            let x1 = x1_0;
+            let x2 = x2_0;
+            
+            const hist_x1 = [x1];
+            const hist_x2 = [x2];
+
+            // Équations différentielles d'état
+            const f1 = (t, x1, x2) => x2;
+            const f2 = (t, x1, x2, mu) => -mu * (x1*x1 - 1) * x2 - x1;
+
+            // Boucle d'intégration
+            while (t < t_max) {
+                // Calcul des pentes intermédiaires
+                let k1_1 = f1(t, x1, x2);
+                let k1_2 = f2(t, x1, x2, mu);
+
+                let k2_1 = f1(t + dt/2, x1 + k1_1*dt/2, x2 + k1_2*dt/2);
+                let k2_2 = f2(t + dt/2, x1 + k1_1*dt/2, x2 + k1_2*dt/2, mu);
+
+                let k3_1 = f1(t + dt/2, x1 + k2_1*dt/2, x2 + k2_2*dt/2);
+                let k3_2 = f2(t + dt/2, x1 + k2_1*dt/2, x2 + k2_2*dt/2, mu);
+
+                let k4_1 = f1(t + dt, x1 + k3_1*dt, x2 + k3_2*dt);
+                let k4_2 = f2(t + dt, x1 + k3_1*dt, x2 + k3_2*dt, mu);
+
+                // Mise à jour de l'état
+                x1 = x1 + (dt/6) * (k1_1 + 2*k2_1 + 2*k3_1 + k4_1);
+                x2 = x2 + (dt/6) * (k1_2 + 2*k2_2 + 2*k3_2 + k4_2);
+                t += dt;
+
+                hist_x1.push(x1);
+                hist_x2.push(x2);
+            }
+
+            return { x1: hist_x1, x2: hist_x2 };
+        }
+
+        /**
+         * Coordonne la lecture de l'UI, le calcul mathématique et le rendu final.
+         */
+        function executeSimulation() {
+            // Lecture sécurisée des paramètres
+            const mu = parseFloat(paramMu.value);
+            const x1_start = parseFloat(paramX1.value);
+            const x2_start = parseFloat(paramX2.value);
+            
+            // 1. Génération du fond vectoriel
+            const traceVectorField = generateVectorField(mu);
+
+            // 2. Calcul de la trajectoire dynamique
+            const sysData = integrateRK4(mu, x1_start, x2_start);
+
+            // Création de la trace pour la trajectoire
+            const traceTraj = {
+                x: sysData.x1,
+                y: sysData.x2,
+                mode: 'lines',
+                line: { color: '#00f0ff', width: 3, shape: 'spline' },
+                name: 'Trajectoire dynamique'
+            };
+
+            // Création d'un marqueur pour le point de départ
+            const traceStartPoint = {
+                x: [x1_start],
+                y: [x2_start],
+                mode: 'markers',
+                marker: { color: '#ff007f', size: 12, line: { color: '#fff', width: 2 } },
+                name: 'Condition Initiale (CI)'
+            };
+
+            // Assemblage et Rendu
+            const dataPackage = [traceVectorField, traceTraj, traceStartPoint];
+            Plotly.newPlot('plotly-container', dataPackage, plotlyLayout, plotlyConfig);
+        }
+
+        /**
+         * Mise à jour des labels de l'UI en temps réel lors du déplacement des sliders
+         */
+        function updateUIDisplays() {
+            displayMu.textContent = parseFloat(paramMu.value).toFixed(1);
+            displayX1.textContent = parseFloat(paramX1.value).toFixed(2);
+            displayX2.textContent = parseFloat(paramX2.value).toFixed(2);
+        }
+
+        // 3. Attachement des écouteurs d'événements
+        paramMu.addEventListener('input', () => { updateUIDisplays(); executeSimulation(); });
+        paramX1.addEventListener('input', updateUIDisplays);
+        paramX2.addEventListener('input', updateUIDisplays);
+        
+        btnCalc.addEventListener('click', () => {
+            // Ajout d'un petit effet visuel sur le bouton lors du clic
+            btnCalc.style.transform = 'scale(0.98)';
+            setTimeout(() => { btnCalc.style.transform = 'translateY(-2px)'; }, 100);
+            executeSimulation();
+        });
+
+        // 4. Lancement initial de la simulation au chargement de la page
+        updateUIDisplays();
+        executeSimulation();
+    });
+</script>
+
+</body>
+</html>
